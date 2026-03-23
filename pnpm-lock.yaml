@@ -8,19 +8,31 @@ importers:
 
   .:
     dependencies:
-      '@tailwindcss/vite':
-        specifier: ^4.2.2
-        version: 4.2.2(vite@8.0.1(@types/node@25.5.0)(jiti@2.6.1))
+      '@xstate/vue':
+        specifier: ^5.0.0
+        version: 5.0.0(vue@3.5.30)(xstate@5.28.0)
       tailwindcss:
         specifier: ^4.2.2
         version: 4.2.2
+      vue:
+        specifier: ^3.5.30
+        version: 3.5.30
       vue-router:
-        specifier: ^4.6.4
+        specifier: '4'
         version: 4.6.4(vue@3.5.30)
       xstate:
         specifier: ^5.28.0
         version: 5.28.0
     devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.2.2
+        version: 4.2.2(vite@8.0.1(@types/node@25.5.0)(jiti@2.6.1))
+      '@vitejs/plugin-vue':
+        specifier: ^6.0.5
+        version: 6.0.5(vite@8.0.1(@types/node@25.5.0)(jiti@2.6.1))(vue@3.5.30)
+      '@vue/plugin-vue':
+        specifier: npm:@vitejs/plugin-vue@^6.0.5
+        version: '@vitejs/plugin-vue@6.0.5(vite@8.0.1(@types/node@25.5.0)(jiti@2.6.1))(vue@3.5.30)'
       '@vue/test-utils':
         specifier: ^2.4.6
         version: 2.4.6
@@ -193,6 +205,9 @@ packages:
   '@rolldown/pluginutils@1.0.0-rc.10':
     resolution: {integrity: sha512-UkVDEFk1w3mveXeKgaTuYfKWtPbvgck1dT8TUG3bnccrH0XtLTuAyfCoks4Q/M5ZGToSVJTIQYCzy2g/atAOeg==}
 
+  '@rolldown/pluginutils@1.0.0-rc.2':
+    resolution: {integrity: sha512-izyXV/v+cHiRfozX62W9htOAvwMo4/bXKDrQ+vom1L1qRuexPock/7VZDAhnpHCLNejd3NJ6hiab+tO0D44Rgw==}
+
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
@@ -311,6 +326,13 @@ packages:
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
+  '@vitejs/plugin-vue@6.0.5':
+    resolution: {integrity: sha512-bL3AxKuQySfk1iGcBsQnoRVexTPJq0Z/ixFVM8OhVJAP6ZXXXLtM7NFKWhLl30Kg7uTBqIaPXbh+nuQCuBDedg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    peerDependencies:
+      vite: ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
+      vue: ^3.2.25
+
   '@vitest/expect@4.1.0':
     resolution: {integrity: sha512-EIxG7k4wlWweuCLG9Y5InKFwpMEOyrMb6ZJ1ihYu02LVj/bzUwn2VMU+13PinsjRW75XnITeFrQBMH5+dLvCDA==}
 
@@ -374,6 +396,15 @@ packages:
 
   '@vue/test-utils@2.4.6':
     resolution: {integrity: sha512-FMxEjOpYNYiFe0GkaHsnJPXFHxQ6m4t8vI/ElPGpMWxZKpmRvQ33OIrvRXemy6yha03RxhOlQuy+gZMC3CQSow==}
+
+  '@xstate/vue@5.0.0':
+    resolution: {integrity: sha512-9TyJV4yz5QLJdEU44Ly9LBooEyZmv0nht3qEvDflxXAJmSn1dzaZeESdHFm+ANHtxoUed5jGqH6NT86BusvXQg==}
+    peerDependencies:
+      vue: ^3.0.0
+      xstate: ^5.20.0
+    peerDependenciesMeta:
+      xstate:
+        optional: true
 
   abbrev@2.0.0:
     resolution: {integrity: sha512-6/mh1E2u2YgEsCHdY0Yx5oW+61gZU+1vXaoiHHrpKeuRNNgFvS+/jrwHiQhB5apAf5oB7UB7E19ol2R2LKH8hQ==}
@@ -989,6 +1020,8 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.0-rc.10': {}
 
+  '@rolldown/pluginutils@1.0.0-rc.2': {}
+
   '@standard-schema/spec@1.1.0': {}
 
   '@tailwindcss/node@4.2.2':
@@ -1082,6 +1115,12 @@ snapshots:
   '@types/ws@8.18.1':
     dependencies:
       '@types/node': 25.5.0
+
+  '@vitejs/plugin-vue@6.0.5(vite@8.0.1(@types/node@25.5.0)(jiti@2.6.1))(vue@3.5.30)':
+    dependencies:
+      '@rolldown/pluginutils': 1.0.0-rc.2
+      vite: 8.0.1(@types/node@25.5.0)(jiti@2.6.1)
+      vue: 3.5.30
 
   '@vitest/expect@4.1.0':
     dependencies:
@@ -1184,6 +1223,12 @@ snapshots:
     dependencies:
       js-beautify: 1.15.4
       vue-component-type-helpers: 2.2.12
+
+  '@xstate/vue@5.0.0(vue@3.5.30)(xstate@5.28.0)':
+    dependencies:
+      vue: 3.5.30
+    optionalDependencies:
+      xstate: 5.28.0
 
   abbrev@2.0.0: {}
 
