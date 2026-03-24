@@ -1,21 +1,19 @@
 <script setup>
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from "vue-router";
 
 // router para volver al inicio
-const router = useRouter()
+const router = useRouter();
 
 // usamos route para leer los datos que vienen del juego
-const route = useRoute()
+const route = useRoute();
 
 // stats principales
-const attempts = route.query.attempts
-const correct = route.query.correct
-const incorrect = route.query.incorrect
+const attempts = route.query.attempts;
+const correct = route.query.correct;
+const incorrect = route.query.incorrect;
 
 // historial de preguntas (viene como string desde la URL, lo parseamos)
-const historyData = route.query.history
-  ? JSON.parse(route.query.history)
-  : []
+const historyData = route.query.history ? JSON.parse(route.query.history) : [];
 </script>
 
 <template>
@@ -34,12 +32,12 @@ const historyData = route.query.history
     <h2 class="text-xl mb-3">Historial</h2>
 
     <div v-for="(item, i) in historyData" :key="i" class="text-sm mb-1">
-      {{ item.question }} - 
-      {{ item.correct ? '✔️' : '❌' }}
+      {{ item.question }} - {{ item.correct ? "✔️" : "❌" }} -
+      {{ (item.time / 1000).toFixed(2) }}s
     </div>
 
     <!-- botón volver -->
-    <button 
+    <button
       class="mt-6 bg-blue-500 text-white p-3 rounded hover:bg-blue-600"
       @click="router.push('/')"
     >
