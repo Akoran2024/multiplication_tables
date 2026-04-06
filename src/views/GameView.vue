@@ -3,175 +3,171 @@ import { ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import VirtualKeyboard from "../components/VirtualKeyboard.vue";
 
-// para leer el nivel y navegar
 const route = useRoute();
 const router = useRouter();
 
-// cogemos el nivel desde la url
-const level = Number(route.query.level);
+// Control de vista
+const isFinished = ref(false);
 
-// pregunta actual y respuesta correcta
+// Lógica de juego
+const level = Number(route.query.level) || 1;
 const question = ref(null);
 const correctAnswer = ref(null);
-
-// tiempo del juego (60s)
 const timeLeft = ref(60);
 let timer = null;
-
-// momento en el que aparece cada pregunta
 let questionStartTime = 0;
 
-// estadísticas
+// Estadísticas
 const attempts = ref(0);
 const correct = ref(0);
 const incorrect = ref(0);
-
-// guardamos historial de preguntas
 const history = ref([]);
 
-// configuración de niveles
-const levels = {
-  1: { tables: [1, 2, 10], range: [1, 10] },
-  2: { tables: [3, 4, 5], range: [1, 10] },
-  3: { tables: [6, 7, 8, 9], range: [1, 10] },
-  4: { tables: [6, 7, 8], range: [6, 9], extra: [11] },
-  5: { tables: [12, 13], range: [1, 10] },
-};
-
-// número aleatorio de un array
-function random(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-// número aleatorio entre min y max
-function randomBetween(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-// genera una nueva pregunta
 function generateQuestion() {
-  const lvl = levels[level];
-
-  let table;
-  let multiplier;
-
-  // nivel 4 (tiene lógica especial)
+  const levels = {
+    1: { tables: [1, 2, 10], range: [1, 10] },
+    2: { tables: [3, 4, 5], range: [1, 10] },
+    3: { tables: [6, 7, 8, 9], range: [1, 10] },
+    4: { tables: [6, 7, 8], range: [6, 9], extra: [11] },
+    5: { tables: [12, 13], range: [1, 10] },
+  };
+  
+  const lvl = levels[level] || levels[1];
+  let table, multiplier;
+  
   if (level === 4) {
     const useExtra = Math.random() < 0.3;
-
-    if (useExtra) {
-      table = 11;
-      multiplier = randomBetween(1, 10);
-    } else {
-      table = random(lvl.tables);
-      multiplier = randomBetween(lvl.range[0], lvl.range[1]);
-    }
+    table = useExtra ? 11 : lvl.tables[Math.floor(Math.random() * lvl.tables.length)];
+    multiplier = useExtra ? Math.floor(Math.random() * 10) + 1 : Math.floor(Math.random() * (lvl.range[1] - lvl.range[0] + 1)) + lvl.range[0];
   } else {
-    table = random(lvl.tables);
-    multiplier = randomBetween(lvl.range[0], lvl.range[1]);
+    table = lvl.tables[Math.floor(Math.random() * lvl.tables.length)];
+    multiplier = Math.floor(Math.random() * (lvl.range[1] - lvl.range[0] + 1)) + lvl.range[0];
   }
-
-  question.value = `${table} x ${multiplier}`;
+  
+  question.value = `${table} × ${multiplier}`;
   correctAnswer.value = table * multiplier;
-
-  // guardamos el tiempo de inicio de la pregunta
   questionStartTime = performance.now();
 }
 
-// inicia el contador
 function startTimer() {
   timer = setInterval(() => {
     timeLeft.value--;
-
-    // cuando llega a 0 termina el juego
     if (timeLeft.value <= 0) {
       clearInterval(timer);
-
-      // mandamos los resultados
-      router.push({
-        path: "/results",
-        query: {
-          attempts: attempts.value,
-          correct: correct.value,
-          incorrect: incorrect.value,
-          history: JSON.stringify(history.value),
-        },
-      });
+      isFinished.value = true; // Cambiamos a la pantalla de resultados
     }
   }, 1000);
 }
 
-// respuesta del usuario
 const userAnswer = ref("");
 
-// cuando el usuario responde
 function submitAnswer() {
-  // calculamos cuánto tardó
-  const timeSpent = performance.now() - questionStartTime;
+  if (isFinished.value) return;
 
   const isCorrect = Number(userAnswer.value) === correctAnswer.value;
-
   attempts.value++;
-
-  if (isCorrect) correct.value++;
+  
+  if (isCorrect) correct.value++; 
   else incorrect.value++;
 
-  // guardamos info de la pregunta
-  history.value.push({
-    question: question.value,
-    correct: isCorrect,
-    time: timeSpent,
+  history.value.push({ 
+    question: question.value, 
+    correct: isCorrect, 
+    time: performance.now() - questionStartTime 
   });
 
-  // limpiamos y generamos nueva
   userAnswer.value = "";
   generateQuestion();
 }
 
-// al cargar la página empieza el juego
-onMounted(() => {
-  generateQuestion();
-  startTimer();
+onMounted(() => { 
+  generateQuestion(); 
+  startTimer(); 
 });
 
-// añadir número desde teclado virtual
-function handleInput(num) {
-  userAnswer.value += num;
-}
-
-// borrar último número
-function handleDelete() {
-  userAnswer.value = userAnswer.value.slice(0, -1);
-}
+function handleInput(num) { userAnswer.value += num; }
+function handleDelete() { userAnswer.value = userAnswer.value.slice(0, -1); }
 </script>
 
 <template>
-  <div class="p-6 max-w-md mx-auto text-center">
-    <!-- tiempo -->
-    <h1 class="text-xl font-semibold mb-4">Tiempo: {{ timeLeft }}</h1>
+  <div class="min-h-screen bg-slate-950 text-white p-6 flex flex-col items-center justify-center">
+    
+    <div v-if="!isFinished" class="w-full max-w-md flex flex-col h-full justify-between italic">
+      <div class="w-full flex justify-between items-end border-b border-white/10 pb-4">
+        <div class="flex flex-col text-left">
+          <span class="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em]">Misión</span>
+          <span class="text-2xl font-black italic uppercase leading-none">Nivel {{ level }}</span>
+        </div>
+        <div class="flex flex-col items-end">
+          <span class="text-[10px] font-black text-red-500 uppercase tracking-[0.3em]">Energía</span>
+          <span class="text-4xl font-black font-mono leading-none" :class="timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'">
+            {{ timeLeft }}s
+          </span>
+        </div>
+      </div>
 
-    <!-- pregunta -->
-    <h2 class="text-3xl font-bold my-6">
-      {{ question }}
-    </h2>
+      <div class="flex flex-col items-center my-10">
+        <div class="w-full bg-gradient-to-b from-slate-900 to-black p-12 rounded-[3rem] border border-white/10 shadow-2xl mb-10 text-center relative overflow-hidden">
+          <p class="text-indigo-500 text-xs font-black uppercase mb-4 tracking-widest animate-pulse">Resolviendo...</p>
+          <h2 class="text-7xl font-black tracking-tighter">{{ question }}</h2>
+        </div>
 
-    <!-- respuesta del usuario -->
-    <div class="text-3xl mb-6 bg-gray-100 p-4 rounded">
-      {{ userAnswer || "_" }}
+        <div class="w-32 h-20 flex items-center justify-center bg-white/5 rounded-2xl border-2 border-indigo-500/50 mb-10">
+          <span class="text-5xl font-black text-indigo-400">{{ userAnswer || "..." }}</span>
+        </div>
+
+        <VirtualKeyboard @input="handleInput" @delete="handleDelete" @submit="submitAnswer" />
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div class="bg-white/5 p-4 rounded-2xl border border-white/5 text-left">
+          <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Aciertos</p>
+          <p class="text-2xl font-black text-green-500">{{ correct }}</p>
+        </div>
+        <div class="bg-white/5 p-4 rounded-2xl border border-white/5 text-right">
+          <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fallos</p>
+          <p class="text-2xl font-black text-red-500">{{ incorrect }}</p>
+        </div>
+      </div>
     </div>
 
-    <!-- teclado -->
-    <VirtualKeyboard
-      @input="handleInput"
-      @delete="handleDelete"
-      @submit="submitAnswer"
-    />
+    <div v-else class="w-full max-w-md animate-in fade-in zoom-in duration-500 italic">
+      <div class="text-center mb-8">
+        <h1 class="text-5xl font-black uppercase tracking-tighter text-white">Misión Finalizada</h1>
+        <div class="h-1 w-20 bg-indigo-500 mx-auto mt-2 rounded-full shadow-lg"></div>
+      </div>
 
-    <!-- stats en tiempo real -->
-    <div class="mt-6 bg-gray-100 p-4 rounded text-left">
-      <p>Intentos: {{ attempts }}</p>
-      <p class="text-green-600">Aciertos: {{ correct }}</p>
-      <p class="text-red-600">Fallos: {{ incorrect }}</p>
+      <div class="bg-slate-900 rounded-[2.5rem] p-8 border border-white/10 text-center mb-6">
+        <p class="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-2">Aciertos Logrados</p>
+        <p class="text-8xl font-black leading-none mb-4">{{ correct }}</p>
+        <div class="flex justify-around border-t border-white/5 pt-6">
+          <div>
+            <p class="text-[10px] font-bold text-slate-500 uppercase">Intentos</p>
+            <p class="text-xl font-black">{{ attempts }}</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-red-500 uppercase">Fallos</p>
+            <p class="text-xl font-black text-red-500">{{ incorrect }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="max-h-48 overflow-y-auto mb-6 space-y-2 pr-2">
+        <div v-for="(item, i) in history" :key="i" class="flex justify-between p-3 bg-white/5 rounded-xl border border-white/5 text-sm">
+          <span>{{ item.question }}</span>
+          <span :class="item.correct ? 'text-green-500' : 'text-red-500'">
+            {{ item.correct ? '✓' : '×' }}
+          </span>
+        </div>
+      </div>
+
+      <button 
+        @click="router.push('/')"
+        class="w-full py-5 bg-indigo-600 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-500 transition-all active:scale-95 shadow-lg shadow-indigo-500/20"
+      >
+        Volver a la Base
+      </button>
     </div>
+
   </div>
 </template>
