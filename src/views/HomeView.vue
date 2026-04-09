@@ -1,15 +1,6 @@
 <script setup>
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
-
-function selectLevel(level) {
-  router.push({ path: '/game', query: { level } })
-}
-</script>
-
-<script setup>
-// No necesitamos selectLevel porque usamos :to en RouterLink
+// Ya no necesitamos importar useRouter ni definir funciones, 
+// RouterLink se encarga de todo de forma semántica.
 </script>
 
 <template>
@@ -23,7 +14,7 @@ function selectLevel(level) {
       <div class="grid grid-cols-1 gap-4">
         <RouterLink 
           v-for="n in 5" :key="n"
-          :to="{ path: '/game', query: { level: n } }"
+          :to="{ name: 'game', params: { level: n } }"
           class="group relative block overflow-hidden bg-white border-2 border-slate-200 p-5 rounded-2xl transition-all duration-200 hover:border-indigo-500 hover:-translate-y-1 active:scale-95 shadow-sm hover:shadow-xl hover:shadow-indigo-100"
         >
           <div class="flex justify-between items-center relative z-10">
