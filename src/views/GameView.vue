@@ -1,163 +1,247 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import VirtualKeyboard from "../components/VirtualKeyboard.vue";
 
+// read the route and navigate
 const route = useRoute();
 const router = useRouter();
 
-const isFinished = ref(false);
-const level = Number(route.query.level) || 1;
+// get the level from URL query (reactive)
+const level = computed(() => Number(route.query.level));
+
+// current question and correct answer
 const question = ref(null);
-const lastQuestion = ref(""); // Para evitar repeticiones
 const correctAnswer = ref(null);
+
+// game timer (seconds)
 const timeLeft = ref(60);
 let timer = null;
+
+// start time of current question
 let questionStartTime = 0;
 
+// last question to avoid repetition
+let lastQuestion = "";
+
+// game statistics
 const attempts = ref(0);
 const correct = ref(0);
 const incorrect = ref(0);
+
+// history of questions with correctness and time spent
 const history = ref([]);
 
-function generateQuestion() {
-  const levels = {
-    1: { tables: [1, 2, 10], range: [1, 10] },
-    2: { tables: [3, 4, 5], range: [1, 10] },
-    3: { tables: [6, 7, 8, 9], range: [1, 10] },
-    4: { tables: [6, 7, 8], range: [6, 9], extra: [11] },
-    5: { tables: [12, 13], range: [1, 10] },
-  };
-  
-  const lvl = levels[level] || levels[1];
-  let table, multiplier, newQuestion;
-  
-  // UX: Bucle para evitar que salga la misma pregunta dos veces seguidas
-  do {
-    if (level === 4) {
-      const useExtra = Math.random() < 0.3;
-      table = useExtra ? 11 : lvl.tables[Math.floor(Math.random() * lvl.tables.length)];
-      multiplier = useExtra ? Math.floor(Math.random() * 10) + 1 : Math.floor(Math.random() * (lvl.range[1] - lvl.range[0] + 1)) + lvl.range[0];
-    } else {
-      table = lvl.tables[Math.floor(Math.random() * lvl.tables.length)];
-      multiplier = Math.floor(Math.random() * (lvl.range[1] - lvl.range[0] + 1)) + lvl.range[0];
+// pool of questions for the current level
+const questionsPool = ref([]);
+
+// game over state
+const gameOver = ref(false);
+
+// user input answer
+const userAnswer = ref("");
+
+// level configurations
+const levels = {
+  1: { tables: [1, 2, 10], range: [1, 10] },
+  2: { tables: [3, 4, 5], range: [1, 10] },
+  3: { tables: [6, 7, 8, 9], range: [1, 10] },
+  4: { tables: [6, 7, 8, 11], range: [1, 10] },
+  5: { tables: [12, 13], range: [1, 10] },
+};
+
+// validate level and start game
+onMounted(() => {
+  console.log("GameView mounted, level:", level.value);
+  if (!levels[level.value]) {
+    console.error("Invalid level:", level.value);
+    router.push({ name: "home" });
+    return;
+  }
+
+  // generate first question
+  generateQuestion();
+  console.log("First question generated:", question.value);
+
+  // start game timer
+  startTimer();
+});
+
+function initializePool() {
+  const lvl = levels[level.value];
+  const pool = [];
+
+  lvl.tables.forEach((table) => {
+    for (let i = lvl.range[0]; i <= lvl.range[1]; i++) {
+      pool.push({ table, multiplier: i });
     }
-    newQuestion = `${table} × ${multiplier}`;
-  } while (newQuestion === lastQuestion.value);
+  });
+
+  // Shuffle pool (Fisher-Yates)
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  // avoid repeating last question from previous pool
+  if (
+    pool.length > 1 &&
+    `${pool[0].table} x ${pool[0].multiplier}` === lastQuestion
+  ) {
+    const first = pool.shift();
+    pool.push(first);
+  }
+
+  questionsPool.value = pool;
+}
+
+function generateQuestion() {
+  if (questionsPool.value.length === 0) {
+    initializePool();
+  }
+
+  const { table, multiplier } = questionsPool.value.shift();
+  const newQuestion = `${table} x ${multiplier}`;
 
   question.value = newQuestion;
-  lastQuestion.value = newQuestion;
   correctAnswer.value = table * multiplier;
+  lastQuestion = newQuestion;
+
+  // save start time for timing
   questionStartTime = performance.now();
 }
 
+// start the countdown timer
 function startTimer() {
   timer = setInterval(() => {
     timeLeft.value--;
+
     if (timeLeft.value <= 0) {
       clearInterval(timer);
-      isFinished.value = true;
+      gameOver.value = true;
     }
   }, 1000);
 }
 
-const userAnswer = ref("");
-
+// handle answer submission
 function submitAnswer() {
-  if (isFinished.value) return;
+  if (gameOver.value) return; // cannot answer after game over
+
+  const timeSpent = performance.now() - questionStartTime;
   const isCorrect = Number(userAnswer.value) === correctAnswer.value;
+
   attempts.value++;
-  if (isCorrect) correct.value++; else incorrect.value++;
-  history.value.push({ question: question.value, correct: isCorrect, time: performance.now() - questionStartTime });
+  if (isCorrect) correct.value++;
+  else incorrect.value++;
+
+  history.value.push({
+    question: question.value,
+    correct: isCorrect,
+    time: timeSpent,
+  });
+
   userAnswer.value = "";
   generateQuestion();
 }
 
-onMounted(() => { generateQuestion(); startTimer(); });
-function handleInput(num) { userAnswer.value += num; }
-function handleDelete() { userAnswer.value = userAnswer.value.slice(0, -1); }
+// virtual keyboard input handler (simple-keyboard)
+function handleInput(num) {
+  if (!gameOver.value) {
+    userAnswer.value += num;
+  }
+}
+
+// delete last character
+function handleDelete() {
+  if (!gameOver.value) {
+    userAnswer.value = userAnswer.value.slice(0, -1);
+  }
+}
+
+// handle key press from simple-keyboard
+function onKeyPress(button) {
+  if (button === "{bksp}") {
+    handleDelete();
+  } else if (button === "{enter}") {
+    submitAnswer();
+  } else {
+    handleInput(button);
+  }
+}
+
+// restart current level
+function restartLevel() {
+  timeLeft.value = 60;
+  attempts.value = 0;
+  correct.value = 0;
+  incorrect.value = 0;
+  history.value = [];
+  questionsPool.value = [];
+  gameOver.value = false;
+
+  userAnswer.value = "";
+
+  generateQuestion();
+  startTimer();
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-950 text-white p-6 flex flex-col items-center justify-center italic">
-    
-    <div v-if="!isFinished" class="w-full max-w-md flex flex-col h-full justify-between italic">
-      <div class="w-full flex justify-between items-end border-b border-white/10 pb-4">
-        <div class="flex flex-col text-left">
-          <span class="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em]">Misión</span>
-          <span class="text-2xl font-black italic uppercase leading-none">Nivel {{ level }}</span>
-        </div>
-        <div class="flex flex-col items-end">
-          <span class="text-[10px] font-black text-red-500 uppercase tracking-[0.3em]">Energía</span>
-          <span class="text-4xl font-black font-mono leading-none" :class="timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'">
-            {{ timeLeft }}s
-          </span>
-        </div>
-      </div>
+  <div class="p-6 max-w-md mx-auto text-center">
+    <!-- timer -->
+    <h1 class="text-xl font-semibold mb-4">
+      {{ $t("game.time") }}: {{ timeLeft }}
+    </h1>
 
-      <div class="flex flex-col items-center my-10">
-        <div class="w-full bg-gradient-to-b from-slate-900 to-black p-12 rounded-[3rem] border border-white/10 shadow-2xl mb-10 text-center relative overflow-hidden">
-          <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-          <p class="text-indigo-500 text-xs font-black uppercase mb-4 tracking-widest animate-pulse">Resolviendo...</p>
-          <h2 class="text-7xl font-black tracking-tighter">{{ question }}</h2>
-        </div>
+    <!-- question -->
+    <h2 class="text-3xl font-bold my-6">
+      {{ question }}
+    </h2>
 
-        <div class="w-32 h-20 flex items-center justify-center bg-white/5 rounded-2xl border-2 border-indigo-500/50 mb-10">
-          <span class="text-5xl font-black text-indigo-400">{{ userAnswer || "..." }}</span>
-        </div>
+    <!-- user answer -->
+    <div class="text-3xl mb-6 bg-gray-100 p-4 rounded">
+      {{ userAnswer || "_" }}
+    </div>
 
-        <VirtualKeyboard @input="handleInput" @delete="handleDelete" @submit="submitAnswer" />
-      </div>
+    <!-- simple-keyboard component -->
+    <VirtualKeyboard :input="userAnswer" @keypress="onKeyPress" />
 
-      <div class="grid grid-cols-2 gap-4">
-        <div class="bg-white/5 p-4 rounded-2xl border border-white/5 text-left">
-          <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Aciertos</p>
-          <p class="text-2xl font-black text-green-500 leading-none">{{ correct }}</p>
-        </div>
-        <div class="bg-white/5 p-4 rounded-2xl border border-white/5 text-right">
-          <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fallos</p>
-          <p class="text-2xl font-black text-red-500 leading-none">{{ incorrect }}</p>
-        </div>
+    <!-- statistics (always visible) -->
+    <div class="mt-6 bg-gray-100 p-4 rounded text-center">
+      <p>{{ $t("game.attempts") }}: {{ attempts }}</p>
+      <p class="text-green-600">{{ $t("game.correct") }}: {{ correct }}</p>
+      <p class="text-red-600">{{ $t("game.incorrect") }}: {{ incorrect }}</p>
+    </div>
+
+    <!-- results & history (only when game is over) -->
+    <div v-if="gameOver" class="mt-6 bg-gray-100 p-4 rounded text-center">
+      <h3 class="mt-2 font-semibold mb-2">{{ $t("game.history") }}</h3>
+      <div
+        v-for="(item, i) in history"
+        :key="i"
+        class="text-sm mb-1 flex justify-center items-center gap-2"
+      >
+        <span>{{ item.question }}</span>
+        <span>{{ item.correct ? "✔️" : "❌" }}</span>
+        <span>{{ (item.time / 1000).toFixed(2) }} s</span>
       </div>
     </div>
 
-    <div v-else class="w-full max-w-md animate-in fade-in zoom-in duration-500 italic">
-      <div class="text-center mb-8">
-        <h1 class="text-5xl font-black uppercase tracking-tighter text-white leading-tight">Misión Finalizada</h1>
-        <div class="h-1 w-20 bg-indigo-500 mx-auto mt-2 rounded-full shadow-lg"></div>
-      </div>
-
-      <div class="bg-slate-900 rounded-[2.5rem] p-8 border border-white/10 text-center mb-6 shadow-2xl">
-        <p class="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-2">Aciertos Logrados</p>
-        <p class="text-8xl font-black leading-none mb-4 tracking-tighter">{{ correct }}</p>
-        <div class="flex justify-around border-t border-white/5 pt-6 mt-2">
-          <div>
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Intentos</p>
-            <p class="text-xl font-black">{{ attempts }}</p>
-          </div>
-          <div>
-            <p class="text-[10px] font-bold text-red-500 uppercase tracking-widest">Fallos</p>
-            <p class="text-xl font-black text-red-500">{{ incorrect }}</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="max-h-48 overflow-y-auto mb-6 space-y-2 pr-2">
-        <div v-for="(item, i) in history" :key="i" class="flex justify-between p-4 bg-white/5 rounded-xl border border-white/5 text-sm">
-          <span class="font-bold">{{ item.question }}</span>
-          <span :class="item.correct ? 'text-green-500' : 'text-red-500'" class="font-black uppercase">
-            {{ item.correct ? 'Correcto' : 'Error' }}
-          </span>
-        </div>
-      </div>
-
-      <RouterLink 
-        to="/"
-        class="block w-full text-center py-5 bg-indigo-600 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-500 transition-all active:scale-95 shadow-lg shadow-indigo-500/20"
+    <!-- buttons -->
+    <div class="flex justify-center mt-4 gap-x-4">
+      <button
+        class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+        @click="restartLevel"
       >
-        Volver a la Base
+        {{ $t("game.restart") }}
+      </button>
+
+      <RouterLink
+        :to="{ name: 'home' }"
+        class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+      >
+        {{ $t("game.home") }}
       </RouterLink>
     </div>
-
   </div>
 </template>

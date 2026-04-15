@@ -1,31 +1,40 @@
 <script setup>
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 
-const router = useRouter()
-const route = useRoute()
+const route = useRoute();
+const { locale } = useI18n();
 
-// para saber qué sección está activa
 function isActive(path) {
-  return route.path === path
+  return route.path === path;
 }
 </script>
 
 <template>
-  <header class="bg-blue-500 text-white p-4 flex justify-center gap-6 shadow-md">
-    <button 
-      class="hover:underline font-semibold" 
-      :class="{ 'underline': isActive('/') }"
-      @click="router.push('/')"
-    >
-      Inicio
-    </button>
+  <header class="bg-blue-500 text-white p-4 relative shadow-md">
+    <!-- centered navigation -->
+    <div class="flex justify-center gap-6">
+      <RouterLink to="/">{{ $t("header.home") }}</RouterLink>
+      <RouterLink to="/tables">{{ $t("header.tables") }}</RouterLink>
+    </div>
 
-    <button 
-      class="hover:underline font-semibold" 
-      :class="{ 'underline': isActive('/tables') }"
-      @click="router.push('/tables')"
-    >
-      Tablas
-    </button>
+    <!-- language switch -->
+    <div class="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2">
+      <button
+        @click="locale = 'es'"
+        :class="{ underline: locale === 'es' }"
+        class="hover:underline"
+      >
+        ES
+      </button>
+
+      <button
+        @click="locale = 'en'"
+        :class="{ underline: locale === 'en' }"
+        class="hover:underline"
+      >
+        EN
+      </button>
+    </div>
   </header>
 </template>

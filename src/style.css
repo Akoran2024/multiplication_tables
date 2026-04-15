@@ -1,2 +1,14 @@
-@import "tailwindcss";
+@import "tailwindcss"; 
+@import "simple-keyboard/build/css/index.css";
 
+/* Asegurar que los botones del teclado sean visibles con Tailwind v4 */
+.simple-keyboard.hg-theme-default .hg-button {
+  background: white;
+  color: black;
+  border: 1px solid #ccc;
+}
+
+.simple-keyboard.hg-theme-default .hg-button:active {
+  background: #eee;
+}
+ 
