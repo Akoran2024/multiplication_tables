@@ -24,6 +24,8 @@ const messages = {
       history: "Historial de preguntas",
       restart: "Reiniciar nivel",
       home: "Volver al inicio",
+      ready: "¿Listo?",
+      start: "EMPEZAR",
     },
     tables: {
       title: "Tablas de multiplicar",
@@ -53,6 +55,8 @@ const messages = {
       history: "Question history",
       restart: "Restart level",
       home: "Back to home",
+      ready: "Ready?",
+      start: "START",
     },
     tables: {
       title: "Multiplication tables",

@@ -1,6 +1,8 @@
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useMachine } from "@xstate/vue";
+import { gameMachine } from "../machines/gameMachine.js";
 import VirtualKeyboard from "../components/VirtualKeyboard.vue";
 
 // read the route and navigate
@@ -10,38 +12,7 @@ const router = useRouter();
 // get the level from URL query (reactive)
 const level = computed(() => Number(route.query.level));
 
-// current question and correct answer
-const question = ref(null);
-const correctAnswer = ref(null);
-
-// game timer (seconds)
-const timeLeft = ref(60);
-let timer = null;
-
-// start time of current question
-let questionStartTime = 0;
-
-// last question to avoid repetition
-let lastQuestion = "";
-
-// game statistics
-const attempts = ref(0);
-const correct = ref(0);
-const incorrect = ref(0);
-
-// history of questions with correctness and time spent
-const history = ref([]);
-
-// pool of questions for the current level
-const questionsPool = ref([]);
-
-// game over state
-const gameOver = ref(false);
-
-// user input answer
-const userAnswer = ref("");
-
-// level configurations
+// level configurations for validation
 const levels = {
   1: { tables: [1, 2, 10], range: [1, 10] },
   2: { tables: [3, 4, 5], range: [1, 10] },
@@ -50,7 +21,18 @@ const levels = {
   5: { tables: [12, 13], range: [1, 10] },
 };
 
-// validate level and start game
+// initialize XState machine
+const { snapshot, send } = useMachine(gameMachine, {
+  input: { level: level.value }
+});
+
+// simplify access to context
+const context = computed(() => snapshot.value.context);
+const isIdle = computed(() => snapshot.value.matches('idle'));
+const isPlaying = computed(() => snapshot.value.matches('playing'));
+const isGameOver = computed(() => snapshot.value.matches('gameOver'));
+
+// validate level
 onMounted(() => {
   console.log("GameView mounted, level:", level.value);
   if (!levels[level.value]) {
@@ -58,190 +40,119 @@ onMounted(() => {
     router.push({ name: "home" });
     return;
   }
-
-  // generate first question
-  generateQuestion();
-  console.log("First question generated:", question.value);
-
-  // start game timer
-  startTimer();
+  
+  window.addEventListener("keydown", handleKeyDown);
 });
 
-function initializePool() {
-  const lvl = levels[level.value];
-  const pool = [];
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleKeyDown);
+});
 
-  lvl.tables.forEach((table) => {
-    for (let i = lvl.range[0]; i <= lvl.range[1]; i++) {
-      pool.push({ table, multiplier: i });
-    }
-  });
+// handle physical keyboard input
+function handleKeyDown(event) {
+  if (!isPlaying.value) return;
 
-  // Shuffle pool (Fisher-Yates)
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-
-  // avoid repeating last question from previous pool
-  if (
-    pool.length > 1 &&
-    `${pool[0].table} x ${pool[0].multiplier}` === lastQuestion
-  ) {
-    const first = pool.shift();
-    pool.push(first);
-  }
-
-  questionsPool.value = pool;
-}
-
-function generateQuestion() {
-  if (questionsPool.value.length === 0) {
-    initializePool();
-  }
-
-  const { table, multiplier } = questionsPool.value.shift();
-  const newQuestion = `${table} x ${multiplier}`;
-
-  question.value = newQuestion;
-  correctAnswer.value = table * multiplier;
-  lastQuestion = newQuestion;
-
-  // save start time for timing
-  questionStartTime = performance.now();
-}
-
-// start the countdown timer
-function startTimer() {
-  timer = setInterval(() => {
-    timeLeft.value--;
-
-    if (timeLeft.value <= 0) {
-      clearInterval(timer);
-      gameOver.value = true;
-    }
-  }, 1000);
-}
-
-// handle answer submission
-function submitAnswer() {
-  if (gameOver.value) return; // cannot answer after game over
-
-  const timeSpent = performance.now() - questionStartTime;
-  const isCorrect = Number(userAnswer.value) === correctAnswer.value;
-
-  attempts.value++;
-  if (isCorrect) correct.value++;
-  else incorrect.value++;
-
-  history.value.push({
-    question: question.value,
-    correct: isCorrect,
-    time: timeSpent,
-  });
-
-  userAnswer.value = "";
-  generateQuestion();
-}
-
-// virtual keyboard input handler (simple-keyboard)
-function handleInput(num) {
-  if (!gameOver.value) {
-    userAnswer.value += num;
+  if (event.key >= "0" && event.key <= "9") {
+    send({ type: "INPUT_NUMBER", value: event.key });
+  } else if (event.key === "Backspace") {
+    send({ type: "BACKSPACE" });
+  } else if (event.key === "Enter") {
+    send({ type: "SUBMIT" });
   }
 }
 
-// delete last character
-function handleDelete() {
-  if (!gameOver.value) {
-    userAnswer.value = userAnswer.value.slice(0, -1);
-  }
-}
-
-// handle key press from simple-keyboard
+// handle key press from virtual keyboard (simple-keyboard)
 function onKeyPress(button) {
   if (button === "{bksp}") {
-    handleDelete();
+    send({ type: "BACKSPACE" });
   } else if (button === "{enter}") {
-    submitAnswer();
+    send({ type: "SUBMIT" });
   } else {
-    handleInput(button);
+    send({ type: "INPUT_NUMBER", value: button });
   }
 }
 
 // restart current level
 function restartLevel() {
-  timeLeft.value = 60;
-  attempts.value = 0;
-  correct.value = 0;
-  incorrect.value = 0;
-  history.value = [];
-  questionsPool.value = [];
-  gameOver.value = false;
+  send({ type: "RESTART" });
+}
 
-  userAnswer.value = "";
-
-  generateQuestion();
-  startTimer();
+// start game
+function startGame() {
+  send({ type: "START" });
 }
 </script>
 
 <template>
   <div class="p-6 max-w-md mx-auto text-center">
-    <!-- timer -->
-    <h1 class="text-xl font-semibold mb-4">
-      {{ $t("game.time") }}: {{ timeLeft }}
-    </h1>
-
-    <!-- question -->
-    <h2 class="text-3xl font-bold my-6">
-      {{ question }}
-    </h2>
-
-    <!-- user answer -->
-    <div class="text-3xl mb-6 bg-gray-100 p-4 rounded">
-      {{ userAnswer || "_" }}
-    </div>
-
-    <!-- simple-keyboard component -->
-    <VirtualKeyboard :input="userAnswer" @keypress="onKeyPress" />
-
-    <!-- statistics (always visible) -->
-    <div class="mt-6 bg-gray-100 p-4 rounded text-center">
-      <p>{{ $t("game.attempts") }}: {{ attempts }}</p>
-      <p class="text-green-600">{{ $t("game.correct") }}: {{ correct }}</p>
-      <p class="text-red-600">{{ $t("game.incorrect") }}: {{ incorrect }}</p>
-    </div>
-
-    <!-- results & history (only when game is over) -->
-    <div v-if="gameOver" class="mt-6 bg-gray-100 p-4 rounded text-center">
-      <h3 class="mt-2 font-semibold mb-2">{{ $t("game.history") }}</h3>
-      <div
-        v-for="(item, i) in history"
-        :key="i"
-        class="text-sm mb-1 flex justify-center items-center gap-2"
-      >
-        <span>{{ item.question }}</span>
-        <span>{{ item.correct ? "✔️" : "❌" }}</span>
-        <span>{{ (item.time / 1000).toFixed(2) }} s</span>
-      </div>
-    </div>
-
-    <!-- buttons -->
-    <div class="flex justify-center mt-4 gap-x-4">
+    <!-- Idle state: Start button -->
+    <div v-if="isIdle" class="py-20">
+      <h1 class="text-3xl font-bold mb-8">{{ $t("game.ready") || '¿Listo?' }}</h1>
       <button
-        class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-        @click="restartLevel"
+        class="bg-green-500 text-white text-2xl px-8 py-4 rounded-full font-bold hover:bg-green-600 transition-transform hover:scale-105 shadow-xl"
+        @click="startGame"
       >
-        {{ $t("game.restart") }}
+        {{ $t("game.start") || 'START' }}
       </button>
+    </div>
 
-      <RouterLink
-        :to="{ name: 'home' }"
-        class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-      >
-        {{ $t("game.home") }}
-      </RouterLink>
+    <!-- Playing or Game Over state -->
+    <div v-else>
+      <!-- timer -->
+      <h1 class="text-xl font-semibold mb-4">
+        {{ $t("game.time") }}: {{ context.timeLeft }}
+      </h1>
+
+      <!-- question -->
+      <h2 class="text-3xl font-bold my-6">
+        {{ context.question }}
+      </h2>
+
+      <!-- user answer -->
+      <div class="text-3xl mb-6 bg-gray-100 p-4 rounded min-h-[4rem] flex items-center justify-center">
+        {{ context.userAnswer || "_" }}
+      </div>
+
+      <!-- simple-keyboard component -->
+      <VirtualKeyboard :input="context.userAnswer" @keypress="onKeyPress" />
+
+      <!-- statistics (always visible) -->
+      <div class="mt-6 bg-gray-100 p-4 rounded text-center">
+        <p>{{ $t("game.attempts") }}: {{ context.attempts }}</p>
+        <p class="text-green-600">{{ $t("game.correct") }}: {{ context.correct }}</p>
+        <p class="text-red-600">{{ $t("game.incorrect") }}: {{ context.incorrect }}</p>
+      </div>
+
+      <!-- results & history (only when game is over) -->
+      <div v-if="isGameOver" class="mt-6 bg-gray-100 p-4 rounded text-center">
+        <h3 class="mt-2 font-semibold mb-2">{{ $t("game.history") }}</h3>
+        <div
+          v-for="(item, i) in context.history"
+          :key="i"
+          class="text-sm mb-1 flex justify-center items-center gap-2"
+        >
+          <span>{{ item.question }}</span>
+          <span>{{ item.correct ? "✔️" : "❌" }}</span>
+          <span>{{ (item.time / 1000).toFixed(2) }} s</span>
+        </div>
+      </div>
+
+      <!-- buttons -->
+      <div class="flex justify-center mt-4 gap-x-4">
+        <button
+          class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+          @click="restartLevel"
+        >
+          {{ $t("game.restart") }}
+        </button>
+
+        <RouterLink
+          :to="{ name: 'home' }"
+          class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+        >
+          {{ $t("game.home") }}
+        </RouterLink>
+      </div>
     </div>
   </div>
 </template>
