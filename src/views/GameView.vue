@@ -2,7 +2,7 @@
 import { onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMachine } from "@xstate/vue";
-import { gameMachine } from "../machines/gameMachine.js";
+import { gameMachine, levels } from "../machines/gameMachine.js";
 import VirtualKeyboard from "../components/VirtualKeyboard.vue";
 
 // read the route and navigate
@@ -11,15 +11,6 @@ const router = useRouter();
 
 // get the level from URL query (reactive)
 const level = computed(() => Number(route.query.level));
-
-// level configurations for validation
-const levels = {
-  1: { tables: [1, 2, 10], range: [1, 10] },
-  2: { tables: [3, 4, 5], range: [1, 10] },
-  3: { tables: [6, 7, 8, 9], range: [1, 10] },
-  4: { tables: [6, 7, 8, 11], range: [1, 10] },
-  5: { tables: [12, 13], range: [1, 10] },
-};
 
 // initialize XState machine
 const { snapshot, send } = useMachine(gameMachine, {
@@ -40,29 +31,12 @@ onMounted(() => {
     router.push({ name: "home" });
     return;
   }
-  
-  window.addEventListener("keydown", handleKeyDown);
 });
-
-onBeforeUnmount(() => {
-  window.removeEventListener("keydown", handleKeyDown);
-});
-
-// handle physical keyboard input
-function handleKeyDown(event) {
-  if (!isPlaying.value) return;
-
-  if (event.key >= "0" && event.key <= "9") {
-    send({ type: "INPUT_NUMBER", value: event.key });
-  } else if (event.key === "Backspace") {
-    send({ type: "BACKSPACE" });
-  } else if (event.key === "Enter") {
-    send({ type: "SUBMIT" });
-  }
-}
 
 // handle key press from virtual keyboard (simple-keyboard)
 function onKeyPress(button) {
+  if (!isPlaying.value) return;
+
   if (button === "{bksp}") {
     send({ type: "BACKSPACE" });
   } else if (button === "{enter}") {

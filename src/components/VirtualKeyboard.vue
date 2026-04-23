@@ -14,8 +14,20 @@ const emit = defineEmits(["keypress"]);
 
 let keyboard = null;
 
+// handle physical keyboard input
+function handleKeyDown(event) {
+  if (event.key >= "0" && event.key <= "9") {
+    emit("keypress", event.key);
+  } else if (event.key === "Backspace") {
+    emit("keypress", "{bksp}");
+  } else if (event.key === "Enter") {
+    emit("keypress", "{enter}");
+  }
+}
+
 onMounted(() => {
   console.log("VirtualKeyboard mounted");
+  window.addEventListener("keydown", handleKeyDown);
   
   // Defensive way to get the constructor
   let KClass = Keyboard;
@@ -42,6 +54,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleKeyDown);
   if (keyboard) {
     keyboard.destroy();
   }
